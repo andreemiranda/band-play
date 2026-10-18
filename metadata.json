@@ -1,0 +1,6 @@
+{
+  "name": "Full-Width HLS Stream Player",
+  "description": "Reprodutor de vídeo HLS m3u8 responsivo em largura total com seleção de canais, HLS.js adaptativo, estatísticas de transmissão e controles avançados.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
