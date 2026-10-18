@@ -25,18 +25,18 @@ export const StatsOverlay: React.FC<StatsOverlayProps> = ({ stats, onClose }) =>
 
   return (
     <div
-      className="absolute top-14 left-4 z-50 w-80 max-w-[calc(100%-2rem)] rounded-xl bg-neutral-950/90 backdrop-blur-md border border-neutral-700/80 p-4 text-xs text-neutral-200 shadow-2xl transition-all font-mono select-none"
+      className="absolute top-16 left-4 z-50 w-84 max-w-[calc(100%-2rem)] rounded-2xl bg-neutral-950/95 backdrop-blur-lg border-2 border-neutral-600 p-4 text-xs text-white shadow-2xl transition-all font-mono select-none ring-4 ring-black/70"
       role="region"
       aria-label="Estatísticas Técnicas do Fluxo"
     >
-      <div className="flex items-center justify-between border-b border-neutral-800 pb-2 mb-3">
-        <div className="flex items-center gap-2 text-emerald-400 font-semibold tracking-wide font-sans">
-          <Activity className="w-4 h-4" />
+      <div className="flex items-center justify-between border-b border-neutral-800 pb-2.5 mb-3">
+        <div className="flex items-center gap-2 text-amber-400 font-extrabold tracking-wide font-sans text-xs">
+          <Activity className="w-4 h-4 text-amber-400" />
           <span>ESTATÍSTICAS DA TRANSMISSÃO</span>
         </div>
         <button
           onClick={onClose}
-          className="text-neutral-400 hover:text-white p-1 rounded transition-colors"
+          className="text-neutral-300 hover:text-white p-1 rounded-lg hover:bg-neutral-800 transition-colors"
           aria-label="Fechar estatísticas"
         >
           <X className="w-4 h-4" />
@@ -45,19 +45,23 @@ export const StatsOverlay: React.FC<StatsOverlayProps> = ({ stats, onClose }) =>
 
       <div className="space-y-2">
         <div className="flex justify-between items-center py-0.5">
-          <span className="text-neutral-400 flex items-center gap-1.5 font-sans">
-            <Film className="w-3.5 h-3.5 text-neutral-400" />
+          <span className="text-neutral-300 flex items-center gap-1.5 font-sans font-medium">
+            <Film className="w-3.5 h-3.5 text-neutral-300" />
             Resolução:
           </span>
-          <span className="font-semibold text-neutral-100">{stats.resolution || 'Identificando...'}</span>
+          <span className="font-bold text-amber-300 bg-neutral-900 px-2 py-0.5 rounded border border-neutral-700">
+            {stats.resolution || 'Identificando...'}
+          </span>
         </div>
 
         <div className="flex justify-between items-center py-0.5">
-          <span className="text-neutral-400 flex items-center gap-1.5 font-sans">
-            <Wifi className="w-3.5 h-3.5 text-neutral-400" />
+          <span className="text-neutral-300 flex items-center gap-1.5 font-sans font-medium">
+            <Wifi className="w-3.5 h-3.5 text-neutral-300" />
             Taxa de Bits:
           </span>
-          <span className="font-semibold text-emerald-300">{formatBitrate(stats.bitrate)}</span>
+          <span className="font-bold text-emerald-400 bg-neutral-900 px-2 py-0.5 rounded border border-neutral-700">
+            {formatBitrate(stats.bitrate)}
+          </span>
         </div>
 
         <div className="flex justify-between items-center py-0.5">

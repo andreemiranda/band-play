@@ -505,22 +505,44 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
         onDoubleClick={toggleFullscreen}
       />
 
-      {/* Autoplay Muted Banner */}
-      {showAutoplayMutedPill && (
-        <button
-          onClick={() => {
-            if (videoRef.current) {
-              videoRef.current.muted = false;
-              setIsMuted(false);
-              setShowAutoplayMutedPill(false);
-            }
-          }}
-          className="absolute top-6 right-6 z-50 bg-sky-500 hover:bg-sky-400 text-white text-xs font-semibold px-4 py-2.5 rounded-full shadow-2xl flex items-center gap-2 backdrop-blur animate-bounce transition-transform"
-          aria-label="Ativar som do vídeo"
-        >
-          <UnmuteIcon className="w-4 h-4" />
-          <span>Áudio silenciado. Clique para ativar som</span>
-        </button>
+      {/* Prominent High-Contrast Unmute Banner */}
+      {(showAutoplayMutedPill || isMuted) && (
+        <div className="absolute top-14 sm:top-18 left-1/2 -translate-x-1/2 z-50 w-[94vw] max-w-lg pointer-events-auto">
+          <button
+            onClick={() => {
+              if (videoRef.current) {
+                videoRef.current.muted = false;
+                const nextVol = volume > 0 ? volume : 0.8;
+                videoRef.current.volume = nextVol;
+                setVolume(nextVol);
+                setIsMuted(false);
+                setShowAutoplayMutedPill(false);
+                localStorage.setItem('player_muted', 'false');
+                localStorage.setItem('player_volume', nextVol.toString());
+              }
+            }}
+            className="w-full bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-400 hover:from-yellow-300 hover:to-amber-300 text-neutral-950 font-black p-3.5 sm:p-4 rounded-2xl shadow-[0_0_40px_rgba(245,158,11,0.85)] ring-4 ring-yellow-400/70 border-2 border-white flex items-center justify-between gap-3 transition-all hover:scale-102 active:scale-98 cursor-pointer group animate-pulse"
+            aria-label="Ativar som do vídeo agora"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-neutral-950 text-yellow-400 flex items-center justify-center shrink-0 shadow-lg group-hover:scale-110 transition-transform">
+                <VolumeX className="w-6 h-6 animate-pulse text-amber-300" />
+              </div>
+              <div className="text-left">
+                <p className="text-xs sm:text-base uppercase tracking-wider font-black leading-tight text-neutral-950">
+                  CLIQUE AQUI PARA ATIVAR O SOM
+                </p>
+                <p className="text-[11px] sm:text-xs font-bold text-neutral-800 leading-tight mt-0.5">
+                  Áudio desativado • Clique para ouvir a transmissão
+                </p>
+              </div>
+            </div>
+
+            <div className="shrink-0 bg-neutral-950 text-amber-300 text-xs font-black px-3.5 py-2 rounded-xl shadow-md group-hover:bg-neutral-800 transition">
+              OUVIR AGORA
+            </div>
+          </button>
+        </div>
       )}
 
       {/* Buffering Spinner */}
@@ -564,19 +586,19 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
         <StatsOverlay stats={stats} onClose={() => setShowStats(false)} />
       )}
 
-      {/* Top Overlay: EXACTLY ONE "AO VIVO" BADGE */}
+      {/* Top Overlay: EXACTLY ONE "AO VIVO" BADGE WITH INTENSE CONTRAST */}
       <div
-        className={`absolute top-0 inset-x-0 z-30 p-4 sm:p-6 bg-gradient-to-b from-black/80 via-black/30 to-transparent transition-opacity duration-300 flex items-center justify-between gap-4 pointer-events-none ${
+        className={`absolute top-0 inset-x-0 z-30 p-4 sm:p-6 bg-gradient-to-b from-black/90 via-black/50 to-transparent transition-opacity duration-300 flex items-center justify-between gap-4 pointer-events-none ${
           controlsVisible ? 'opacity-100' : 'opacity-0'
         }`}
       >
-        {/* Single 'AO VIVO' Badge in the entire application */}
+        {/* Single 'AO VIVO' Badge in the entire application - Maximum Prominence */}
         <div className="flex items-center gap-3 pointer-events-auto">
-          <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-black tracking-widest bg-red-600 text-white shadow-xl shadow-red-600/30 select-none">
-            <span className="w-2 h-2 rounded-full bg-white animate-ping" />
+          <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs sm:text-sm font-black tracking-widest bg-red-600 text-white shadow-[0_0_22px_rgba(239,68,68,0.85)] ring-2 ring-white/90 border border-red-500 select-none">
+            <span className="w-2.5 h-2.5 rounded-full bg-white animate-ping" />
             AO VIVO
           </span>
-          <span className="hidden sm:inline-block text-xs font-medium text-neutral-300 truncate max-w-md">
+          <span className="hidden sm:inline-block text-xs sm:text-sm font-bold text-white bg-black/75 px-3 py-1 rounded-xl border border-white/25 backdrop-blur shadow-md truncate max-w-md">
             {streamName}
           </span>
         </div>
@@ -584,14 +606,14 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
         {/* Top-Right Quick Actions */}
         <div className="pointer-events-auto flex items-center gap-2">
           {activeResolution && (
-            <span className="hidden sm:inline-block text-[11px] font-mono px-2.5 py-1 rounded-md bg-neutral-900/80 text-sky-400 border border-neutral-700/80 backdrop-blur">
+            <span className="hidden sm:inline-block text-xs font-mono font-bold px-3 py-1 rounded-xl bg-black/80 text-amber-300 border-2 border-amber-400/80 shadow-md">
               {activeResolution}
             </span>
           )}
 
           <button
             onClick={() => setReloadCounter((c) => c + 1)}
-            className="p-2 text-neutral-300 hover:text-white bg-neutral-900/80 hover:bg-neutral-800 border border-neutral-700/80 rounded-lg transition"
+            className="p-2.5 text-white hover:text-amber-300 bg-black/80 hover:bg-neutral-800 border-2 border-white/30 rounded-xl transition shadow-md"
             title="Recarregar transmissão"
             aria-label="Recarregar"
           >
@@ -601,7 +623,7 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
           {onOpenShortcuts && (
             <button
               onClick={onOpenShortcuts}
-              className="p-2 text-neutral-300 hover:text-white bg-neutral-900/80 hover:bg-neutral-800 border border-neutral-700/80 rounded-lg transition"
+              className="p-2.5 text-white hover:text-amber-300 bg-black/80 hover:bg-neutral-800 border-2 border-white/30 rounded-xl transition shadow-md"
               title="Atalhos de teclado"
               aria-label="Atalhos de teclado"
             >
@@ -611,23 +633,23 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
         </div>
       </div>
 
-      {/* Bottom Floating Controls Bar */}
+      {/* Bottom Floating Controls Bar - Vivid Colors & High Contrast */}
       <div
-        className={`absolute bottom-0 inset-x-0 z-30 p-4 sm:p-6 bg-gradient-to-t from-black/95 via-black/70 to-transparent transition-opacity duration-300 space-y-2.5 ${
+        className={`absolute bottom-0 inset-x-0 z-30 p-4 sm:p-6 bg-gradient-to-t from-black via-black/90 to-transparent transition-opacity duration-300 space-y-3 ${
           controlsVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
       >
         {/* Progress / buffer bar */}
-        <div className="w-full relative py-1 flex items-center">
-          <div className="w-full h-1.5 bg-neutral-800/90 rounded-full overflow-hidden relative">
+        <div className="w-full relative py-1.5 flex items-center cursor-pointer">
+          <div className="w-full h-2 sm:h-2.5 bg-neutral-800/90 rounded-full overflow-hidden relative ring-1 ring-white/20">
             <div
-              className="absolute left-0 top-0 bottom-0 bg-neutral-600/60 rounded-full"
+              className="absolute left-0 top-0 bottom-0 bg-white/40 rounded-full transition-all"
               style={{
                 width: `${Math.min(100, ((currentTime + stats.bufferLength) / (duration || currentTime + stats.bufferLength || 1)) * 100)}%`,
               }}
             />
             <div
-              className="absolute left-0 top-0 bottom-0 bg-sky-500 rounded-full"
+              className="absolute left-0 top-0 bottom-0 bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.9)] rounded-full"
               style={{
                 width: isLive && isAtLiveEdge ? '100%' : `${Math.min(100, (currentTime / (duration || 1)) * 100)}%`,
               }}
@@ -641,42 +663,42 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
           <div className="flex items-center gap-2 sm:gap-3">
             <button
               onClick={togglePlay}
-              className="p-2.5 rounded-xl hover:bg-white/10 active:scale-95 transition text-white"
+              className="p-2.5 sm:p-3 rounded-xl bg-white/10 hover:bg-white/25 active:scale-95 transition text-white hover:text-amber-300 border border-white/25 shadow-md"
               aria-label={isPlaying ? 'Pausar' : 'Reproduzir'}
             >
-              {isPlaying ? <Pause className="w-5 h-5 fill-white" /> : <Play className="w-5 h-5 fill-white" />}
+              {isPlaying ? <Pause className="w-5 h-5 fill-current" /> : <Play className="w-5 h-5 fill-current" />}
             </button>
 
-            {/* Live synchronization indicator (without repeating the word ao vivo) */}
+            {/* Live synchronization indicator */}
             {isLive && (
               <button
                 onClick={jumpToLiveEdge}
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs transition ${
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition shadow-md border ${
                   isAtLiveEdge
-                    ? 'text-emerald-400 bg-emerald-950/40 border border-emerald-800/40 cursor-default'
-                    : 'text-neutral-300 bg-neutral-800 hover:bg-neutral-700'
+                    ? 'bg-emerald-500 text-neutral-950 border-white ring-2 ring-emerald-400/50 cursor-default'
+                    : 'bg-neutral-900 text-white hover:bg-neutral-800 border-white/30'
                 }`}
                 title="Sincronizar com transmissão direta"
                 aria-label="Sincronizar transmissão"
               >
-                <Radio className={`w-3 h-3 ${isAtLiveEdge ? 'animate-pulse' : ''}`} />
-                <span className="font-mono text-[11px]">{isAtLiveEdge ? 'Sincronizado' : 'Sincronizar'}</span>
+                <Radio className={`w-3.5 h-3.5 ${isAtLiveEdge ? 'animate-pulse' : ''}`} />
+                <span className="font-mono text-xs">{isAtLiveEdge ? 'Sincronizado' : 'Sincronizar'}</span>
               </button>
             )}
 
             {/* Volume */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 bg-black/60 px-2 py-1 rounded-xl border border-white/20">
               <button
                 onClick={toggleMute}
-                className="p-2 rounded-xl hover:bg-white/10 transition text-neutral-200 hover:text-white"
+                className="p-1.5 rounded-lg hover:bg-white/20 transition text-white hover:text-amber-300"
                 aria-label={isMuted || volume === 0 ? 'Ativar som' : 'Silenciar'}
               >
                 {isMuted || volume === 0 ? (
-                  <VolumeX className="w-5 h-5 text-rose-400" />
+                  <VolumeX className="w-5 h-5 text-rose-400 animate-pulse" />
                 ) : volume < 0.5 ? (
                   <Volume1 className="w-5 h-5" />
                 ) : (
-                  <Volume2 className="w-5 h-5" />
+                  <Volume2 className="w-5 h-5 text-amber-300" />
                 )}
               </button>
 
@@ -687,12 +709,12 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
                 step="0.05"
                 value={isMuted ? 0 : volume}
                 onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
-                className="w-16 sm:w-28 h-1.5 bg-neutral-700 accent-sky-400 rounded-lg cursor-pointer"
+                className="w-16 sm:w-28 h-2 bg-neutral-600 accent-amber-400 rounded-lg cursor-pointer ring-1 ring-white/20"
                 aria-label="Controle de volume"
               />
             </div>
 
-            <span className="hidden sm:inline-block text-xs font-mono text-neutral-400">
+            <span className="hidden sm:inline-block text-xs font-mono font-bold text-neutral-200 bg-black/60 px-2.5 py-1 rounded-lg border border-white/20 shadow">
               {formatTime(currentTime)}
             </span>
           </div>
@@ -702,7 +724,7 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
             {/* Aspect Ratio Toggle (Cover vs Contain) */}
             <button
               onClick={() => setAspectMode((prev) => (prev === 'contain' ? 'cover' : 'contain'))}
-              className="px-2 py-1 text-xs font-medium rounded-lg text-neutral-300 hover:text-white bg-neutral-900/80 hover:bg-neutral-800 border border-neutral-700/80 transition"
+              className="px-3 py-1.5 text-xs font-extrabold rounded-xl text-white hover:text-amber-300 bg-white/10 hover:bg-white/20 border-2 border-white/30 transition shadow-md"
               title="Ajustar proporção (Ajustar / Preencher)"
               aria-label="Proporção da imagem"
             >
@@ -712,8 +734,10 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
             {/* Stats Overlay Toggle (S) */}
             <button
               onClick={() => setShowStats((prev) => !prev)}
-              className={`p-2 rounded-xl transition ${
-                showStats ? 'bg-sky-500/30 text-sky-400' : 'text-neutral-300 hover:text-white hover:bg-white/10'
+              className={`p-2.5 rounded-xl transition border shadow-md ${
+                showStats
+                  ? 'bg-amber-400 text-neutral-950 font-bold border-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.7)]'
+                  : 'text-white hover:text-amber-300 bg-white/10 hover:bg-white/20 border-white/25'
               }`}
               title="Estatísticas técnicas (S)"
               aria-label="Estatísticas técnicas"
@@ -725,8 +749,10 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
             <div className="relative">
               <button
                 onClick={() => setShowSettingsMenu((prev) => !prev)}
-                className={`p-2 rounded-xl transition flex items-center gap-1.5 text-xs font-medium ${
-                  showSettingsMenu ? 'bg-sky-500/30 text-sky-400' : 'text-neutral-300 hover:text-white hover:bg-white/10'
+                className={`p-2.5 rounded-xl transition flex items-center gap-1.5 text-xs font-bold border shadow-md ${
+                  showSettingsMenu
+                    ? 'bg-amber-400 text-neutral-950 border-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.7)]'
+                    : 'text-white hover:text-amber-300 bg-white/10 hover:bg-white/20 border-white/25'
                 }`}
                 title="Configurações de Transmissão e Qualidade"
                 aria-label="Configurações do vídeo"
@@ -734,18 +760,18 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
                 aria-expanded={showSettingsMenu}
               >
                 <Sliders className="w-4 h-4" />
-                <span className="hidden md:inline font-mono text-[11px]">{activeResolution}</span>
+                <span className="hidden md:inline font-mono text-xs">{activeResolution}</span>
               </button>
 
               {/* Settings Dropdown */}
               {showSettingsMenu && (
                 <div
-                  className="absolute bottom-12 right-0 w-72 bg-neutral-900/95 backdrop-blur-md border border-neutral-700/80 rounded-2xl p-3.5 shadow-2xl text-xs space-y-3 z-50 animate-fadeIn"
+                  className="absolute bottom-14 right-0 w-72 bg-neutral-950 border-2 border-neutral-600 rounded-2xl p-4 shadow-2xl text-xs space-y-3.5 z-50 animate-fadeIn text-white ring-4 ring-black/80"
                   role="menu"
                 >
                   {/* Stream Selection */}
                   <div>
-                    <span className="text-[10px] uppercase font-bold tracking-wider text-neutral-400 px-2 block mb-1">
+                    <span className="text-[11px] uppercase font-black tracking-wider text-amber-300 px-1 block mb-1.5">
                       Fonte de Transmissão
                     </span>
                     <div className="space-y-1">
@@ -755,15 +781,15 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
                           <button
                             key={preset.id}
                             onClick={() => switchPreset(preset.url, preset.title)}
-                            className={`w-full text-left px-2.5 py-1.5 rounded-lg flex items-center justify-between transition ${
+                            className={`w-full text-left px-3 py-2 rounded-xl flex items-center justify-between transition ${
                               isSelected
-                                ? 'bg-sky-500/20 text-sky-300 font-semibold'
-                                : 'hover:bg-neutral-800 text-neutral-300'
+                                ? 'bg-gradient-to-r from-amber-400 to-yellow-300 text-neutral-950 font-black shadow-md'
+                                : 'hover:bg-neutral-800 text-neutral-200 border border-neutral-800'
                             }`}
                             role="menuitem"
                           >
                             <span className="truncate pr-2">{preset.title}</span>
-                            {isSelected && <Check className="w-3.5 h-3.5 text-sky-400 shrink-0" />}
+                            {isSelected && <Check className="w-4 h-4 text-neutral-950 stroke-[3] shrink-0" />}
                           </button>
                         );
                       })}
@@ -771,37 +797,37 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
                   </div>
 
                   {/* Quality Selection */}
-                  <div className="border-t border-neutral-800 pt-2.5">
-                    <span className="text-[10px] uppercase font-bold tracking-wider text-neutral-400 px-2 block mb-1">
+                  <div className="border-t border-neutral-800 pt-3">
+                    <span className="text-[11px] uppercase font-black tracking-wider text-amber-300 px-1 block mb-1.5">
                       Qualidade HLS (ABR)
                     </span>
                     <div className="space-y-1 max-h-48 overflow-y-auto">
                       <button
                         onClick={() => handleSelectQuality(-1)}
-                        className={`w-full text-left px-2.5 py-1.5 rounded-lg flex items-center justify-between transition ${
+                        className={`w-full text-left px-3 py-2 rounded-xl flex items-center justify-between transition ${
                           currentLevel === -1
-                            ? 'bg-sky-500/20 text-sky-300 font-semibold'
-                            : 'hover:bg-neutral-800 text-neutral-300'
+                            ? 'bg-gradient-to-r from-amber-400 to-yellow-300 text-neutral-950 font-black shadow-md'
+                            : 'hover:bg-neutral-800 text-neutral-200 border border-neutral-800'
                         }`}
                         role="menuitem"
                       >
                         <span>Automático (Adaptativo)</span>
-                        {currentLevel === -1 && <Check className="w-3.5 h-3.5 text-sky-400 shrink-0" />}
+                        {currentLevel === -1 && <Check className="w-4 h-4 text-neutral-950 stroke-[3] shrink-0" />}
                       </button>
 
                       {qualityLevels.map((lvl) => (
                         <button
                           key={lvl.id}
                           onClick={() => handleSelectQuality(lvl.id)}
-                          className={`w-full text-left px-2.5 py-1.5 rounded-lg flex items-center justify-between transition ${
+                          className={`w-full text-left px-3 py-2 rounded-xl flex items-center justify-between transition ${
                             currentLevel === lvl.id
-                              ? 'bg-sky-500/20 text-sky-300 font-semibold'
-                              : 'hover:bg-neutral-800 text-neutral-300'
+                              ? 'bg-gradient-to-r from-amber-400 to-yellow-300 text-neutral-950 font-black shadow-md'
+                              : 'hover:bg-neutral-800 text-neutral-200 border border-neutral-800'
                           }`}
                           role="menuitem"
                         >
                           <span>{lvl.label}</span>
-                          {currentLevel === lvl.id && <Check className="w-3.5 h-3.5 text-sky-400 shrink-0" />}
+                          {currentLevel === lvl.id && <Check className="w-4 h-4 text-neutral-950 stroke-[3] shrink-0" />}
                         </button>
                       ))}
                     </div>
@@ -813,7 +839,7 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
             {/* PiP */}
             <button
               onClick={togglePiP}
-              className="p-2 rounded-xl text-neutral-300 hover:text-white hover:bg-white/10 transition hidden sm:inline-block"
+              className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white hover:text-amber-300 border border-white/25 transition hidden sm:inline-block shadow-md"
               title="Janela Flutuante (PiP)"
               aria-label="Janela flutuante"
             >
@@ -823,7 +849,7 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
             {/* Fullscreen */}
             <button
               onClick={toggleFullscreen}
-              className="p-2 rounded-xl text-neutral-300 hover:text-white hover:bg-white/10 transition"
+              className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white hover:text-amber-300 border border-white/25 transition shadow-md"
               title="Tela Cheia (F)"
               aria-label={isFullscreen ? 'Sair da tela cheia' : 'Tela cheia'}
             >
