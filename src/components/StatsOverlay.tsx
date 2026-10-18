@@ -89,8 +89,8 @@ export const StatsOverlay: React.FC<StatsOverlayProps> = ({ stats, onClose }) =>
 
         <div className="flex justify-between items-center py-0.5">
           <span className="text-neutral-400 font-sans">Tipo de Transmissão:</span>
-          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-sans font-medium bg-red-950/70 text-red-300 border border-red-800/50">
-            {stats.isLive ? 'AO VIVO (Live Stream)' : 'VOD / Gravado'}
+          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-sans font-medium bg-neutral-800 text-neutral-300 border border-neutral-700">
+            {stats.isLive ? 'Transmissão Contínua (Live)' : 'VOD / Gravado'}
           </span>
         </div>
 

@@ -18,7 +18,7 @@ export const ShortcutsModal: React.FC<ShortcutsModalProps> = ({ isOpen, onClose 
     { key: 'P', desc: 'Picture-in-Picture (Janela Flutuante)' },
     { key: 'Seta Cima / Baixo', desc: 'Aumentar / Diminuir Volume (5%)' },
     { key: 'Seta Esquerda / Direita', desc: 'Retroceder / Avançar 10 segundos' },
-    { key: '0', desc: 'Ir para o Ponto Ao Vivo (Live Edge)' },
+    { key: '0', desc: 'Sincronizar com transmissão direta' },
   ];
 
   return (

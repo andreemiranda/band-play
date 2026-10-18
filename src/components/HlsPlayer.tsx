@@ -9,19 +9,18 @@ import {
   Maximize,
   Minimize,
   Radio,
-  Settings,
   Activity,
   PictureInPicture,
-  RotateCcw,
-  AlertCircle,
   Sliders,
   Check,
+  RefreshCw,
+  HelpCircle,
   Volume2 as UnmuteIcon,
 } from 'lucide-react';
 import { StatsOverlay, StreamStats } from './StatsOverlay';
-import { getResolutionLabel, formatTime } from '../utils/stream';
+import { getResolutionLabel, formatTime, DEFAULT_PRESETS } from '../utils/stream';
 
-export type AspectRatioMode = '16:9' | '21:9' | 'fill' | 'contain';
+export type AspectRatioMode = 'cover' | 'contain';
 
 interface QualityLevel {
   id: number;
@@ -32,25 +31,23 @@ interface QualityLevel {
 }
 
 interface HlsPlayerProps {
-  streamUrl: string;
-  streamTitle: string;
-  isTheaterMode: boolean;
-  onToggleTheater?: () => void;
-  aspectMode?: AspectRatioMode;
-  onAspectModeChange?: (mode: AspectRatioMode) => void;
+  initialStreamUrl?: string;
+  onOpenShortcuts?: () => void;
 }
 
 export const HlsPlayer: React.FC<HlsPlayerProps> = ({
-  streamUrl,
-  streamTitle,
-  isTheaterMode,
-  aspectMode = '16:9',
-  onAspectModeChange,
+  initialStreamUrl = DEFAULT_PRESETS[0].url,
+  onOpenShortcuts,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const hideControlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Active stream URL
+  const [streamUrl, setStreamUrl] = useState<string>(initialStreamUrl);
+  const [streamName, setStreamName] = useState<string>(DEFAULT_PRESETS[0].title);
+  const [reloadCounter, setReloadCounter] = useState<number>(0);
 
   // Playback state
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
@@ -75,6 +72,7 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [showStats, setShowStats] = useState<boolean>(false);
   const [showSettingsMenu, setShowSettingsMenu] = useState<boolean>(false);
+  const [aspectMode, setAspectMode] = useState<AspectRatioMode>('contain');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Quality levels
@@ -139,7 +137,6 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
       });
 
       hlsRef.current = hls;
-
       hls.attachMedia(video);
 
       hls.on(Hls.Events.MEDIA_ATTACHED, () => {
@@ -182,18 +179,15 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
           }));
         }
 
-        // Attempt playback
+        // Playback attempt
         video.volume = volume;
         video.muted = isMuted;
 
         const playPromise = video.play();
         if (playPromise !== undefined) {
           playPromise
-            .then(() => {
-              setIsPlaying(true);
-            })
+            .then(() => setIsPlaying(true))
             .catch((err) => {
-              // Autoplay was blocked by browser policy, try muted
               console.warn('Autoplay unmuted blocked, falling back to muted:', err);
               video.muted = true;
               setIsMuted(true);
@@ -222,18 +216,15 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
         if (data.fatal) {
           switch (data.type) {
             case Hls.ErrorTypes.NETWORK_ERROR:
-              console.error('Fatal network error encountered, attempting recovery...');
-              setErrorMessage('Falha na rede ao carregar fragmentos do fluxo. Tentando reconectar...');
+              setErrorMessage('Falha temporária de rede. Reconectando...');
               hls.startLoad();
               break;
             case Hls.ErrorTypes.MEDIA_ERROR:
-              console.error('Fatal media error encountered, recovering media...');
-              setErrorMessage('Erro de mídia detectado. Recuperando decodificação...');
+              setErrorMessage('Recuperando decodificação do fluxo...');
               hls.recoverMediaError();
               break;
             default:
-              console.error('Fatal unrecoverable HLS error');
-              setErrorMessage('Não foi possível reproduzir a transmissão. Verifique se o link está ativo e com CORS liberado.');
+              setErrorMessage('Transmissão temporariamente indisponível. Clique em recarregar.');
               hls.destroy();
               break;
           }
@@ -252,8 +243,6 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
           video.play();
         });
       });
-    } else {
-      setErrorMessage('Este navegador não suporta streaming HLS (HTTP Live Streaming).');
     }
 
     return () => {
@@ -262,7 +251,7 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
         hlsRef.current = null;
       }
     };
-  }, [streamUrl]);
+  }, [streamUrl, reloadCounter]);
 
   // Buffer and Stats Monitor Loop
   useEffect(() => {
@@ -280,7 +269,6 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
         }
       }
 
-      // Dropped frames inspection via video.getVideoPlaybackQuality()
       let dropped = 0;
       let total = 0;
       if ('getVideoPlaybackQuality' in video) {
@@ -303,7 +291,7 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
         droppedFrames: dropped,
         totalFrames: total,
         isLive: isLiveNow,
-        resolution: prev.resolution || (video.videoWidth ? `${video.videoWidth}x${video.videoHeight}` : 'Calculando...'),
+        resolution: prev.resolution || (video.videoWidth ? `${video.videoWidth}x${video.videoHeight}` : ''),
       }));
     }, 1000);
 
@@ -402,7 +390,7 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
     hlsRef.current.currentLevel = levelIndex;
     setCurrentLevel(levelIndex);
     if (levelIndex === -1) {
-      setActiveResolution('Auto (Adaptativo)');
+      setActiveResolution('Auto');
     } else {
       const lvl = qualityLevels.find((q) => q.id === levelIndex);
       if (lvl) setActiveResolution(lvl.label);
@@ -410,10 +398,16 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
     setShowSettingsMenu(false);
   };
 
+  const switchPreset = (url: string, name: string) => {
+    setStreamUrl(url);
+    setStreamName(name);
+    setReloadCounter((c) => c + 1);
+    setShowSettingsMenu(false);
+  };
+
   // Keyboard controls listener
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't capture when typing in input
       if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) {
         return;
       }
@@ -473,7 +467,6 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [volume, isMuted, isPlaying]);
 
-  // Sync fullscreen change event
   useEffect(() => {
     const onFsChange = () => {
       setIsFullscreen(!!document.fullscreenElement);
@@ -482,42 +475,19 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
     return () => document.removeEventListener('fullscreenchange', onFsChange);
   }, []);
 
-  // Compute CSS sizing for aspect mode & full width
-  const getAspectClass = () => {
-    if (isFullscreen) return 'w-full h-full';
-    if (isTheaterMode) return 'w-full h-[65vh] sm:h-[75vh] md:h-[82vh] lg:h-[88vh]';
-
-    switch (aspectMode) {
-      case '21:9':
-        return 'w-full aspect-[21/9] min-h-[260px] max-h-[85vh]';
-      case 'fill':
-        return 'w-full h-[55vh] sm:h-[65vh] md:h-[75vh]';
-      case 'contain':
-        return 'w-full h-[55vh] sm:h-[65vh] md:h-[75vh]';
-      case '16:9':
-      default:
-        return 'w-full aspect-video min-h-[240px] max-h-[85vh]';
-    }
-  };
-
-  const getVideoFitClass = () => {
-    if (aspectMode === 'fill') return 'object-cover';
-    return 'object-contain';
-  };
-
   return (
     <div
       ref={containerRef}
       onMouseMove={triggerControlsActivity}
       onTouchStart={triggerControlsActivity}
-      className={`relative w-full bg-black select-none overflow-hidden group transition-all duration-300 flex items-center justify-center ${getAspectClass()}`}
+      className="relative w-full h-screen min-h-[100dvh] max-h-[100dvh] bg-black select-none overflow-hidden flex items-center justify-center"
       role="region"
       aria-label="Reprodutor de Vídeo HLS em Largura Total"
     >
-      {/* HTML5 Video Element */}
+      {/* HTML5 Video Element - Always Full Width */}
       <video
         ref={videoRef}
-        className={`w-full h-full ${getVideoFitClass()} cursor-pointer`}
+        className={`w-full h-full ${aspectMode === 'cover' ? 'object-cover' : 'object-contain'} cursor-pointer`}
         playsInline
         onTimeUpdate={() => {
           if (videoRef.current) {
@@ -535,7 +505,7 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
         onDoubleClick={toggleFullscreen}
       />
 
-      {/* Autoplay Muted Banner Pill */}
+      {/* Autoplay Muted Banner */}
       {showAutoplayMutedPill && (
         <button
           onClick={() => {
@@ -545,50 +515,44 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
               setShowAutoplayMutedPill(false);
             }
           }}
-          className="absolute top-4 right-4 z-40 bg-sky-500/90 hover:bg-sky-400 text-white text-xs font-semibold px-4 py-2 rounded-full shadow-xl flex items-center gap-2 backdrop-blur animate-bounce transition-transform"
+          className="absolute top-6 right-6 z-50 bg-sky-500 hover:bg-sky-400 text-white text-xs font-semibold px-4 py-2.5 rounded-full shadow-2xl flex items-center gap-2 backdrop-blur animate-bounce transition-transform"
           aria-label="Ativar som do vídeo"
         >
           <UnmuteIcon className="w-4 h-4" />
-          <span>Vídeo silenciado automaticamente. Clique para ativar som</span>
+          <span>Áudio silenciado. Clique para ativar som</span>
         </button>
       )}
 
-      {/* Buffering Spinner Overlay */}
+      {/* Buffering Spinner */}
       {isBuffering && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none bg-black/30 backdrop-blur-[2px] z-20">
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none bg-black/40 backdrop-blur-[2px] z-20">
           <div className="flex flex-col items-center gap-3">
-            <div className="w-12 h-12 border-4 border-sky-500/20 border-t-sky-400 rounded-full animate-spin shadow-lg" />
-            <span className="text-xs font-medium text-sky-200 tracking-wider">CARREGANDO TRANSMISSÃO...</span>
+            <div className="w-14 h-14 border-4 border-sky-500/20 border-t-sky-400 rounded-full animate-spin shadow-2xl" />
+            <span className="text-xs font-medium text-sky-200 tracking-wider">CARREGANDO...</span>
           </div>
         </div>
       )}
 
-      {/* Big Center Play/Pause Indicator on manual pause */}
+      {/* Big Center Play/Pause button on pause */}
       {!isPlaying && !isBuffering && (
         <button
           onClick={togglePlay}
           className="absolute inset-0 flex items-center justify-center z-20 bg-black/40 hover:bg-black/30 transition-colors group/center"
-          aria-label="Reproduzir vídeo"
+          aria-label="Reproduzir transmissão"
         >
-          <div className="w-20 h-20 rounded-full bg-sky-500/90 hover:bg-sky-400 text-white flex items-center justify-center shadow-2xl pl-1 group-hover/center:scale-110 transition-transform">
-            <Play className="w-9 h-9 fill-white" />
+          <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-sky-500/90 hover:bg-sky-400 text-white flex items-center justify-center shadow-2xl pl-1.5 group-hover/center:scale-110 transition-transform">
+            <Play className="w-10 h-10 fill-white" />
           </div>
         </button>
       )}
 
       {/* Error Message Toast */}
       {errorMessage && (
-        <div className="absolute top-4 inset-x-4 max-w-lg mx-auto z-40 bg-rose-950/95 border border-rose-700/80 text-rose-200 px-4 py-3 rounded-xl shadow-2xl flex items-start justify-between gap-3 text-xs">
-          <div className="flex items-start gap-2.5">
-            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
-            <div>
-              <p className="font-semibold text-rose-100">Aviso de Reprodução</p>
-              <p className="mt-0.5 text-rose-300">{errorMessage}</p>
-            </div>
-          </div>
+        <div className="absolute top-6 inset-x-4 max-w-md mx-auto z-50 bg-neutral-900/95 border border-rose-600/80 text-rose-200 px-4 py-3 rounded-xl shadow-2xl flex items-center justify-between gap-3 text-xs">
+          <span>{errorMessage}</span>
           <button
             onClick={() => setErrorMessage(null)}
-            className="text-rose-400 hover:text-white shrink-0 font-bold px-1"
+            className="text-rose-400 hover:text-white font-bold px-1"
           >
             ✕
           </button>
@@ -600,48 +564,68 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
         <StatsOverlay stats={stats} onClose={() => setShowStats(false)} />
       )}
 
-      {/* Stream Title Bar (Top gradient) */}
+      {/* Top Overlay: EXACTLY ONE "AO VIVO" BADGE */}
       <div
-        className={`absolute top-0 inset-x-0 z-30 p-4 bg-gradient-to-b from-black/80 via-black/40 to-transparent transition-opacity duration-300 flex items-center justify-between gap-4 pointer-events-none ${
+        className={`absolute top-0 inset-x-0 z-30 p-4 sm:p-6 bg-gradient-to-b from-black/80 via-black/30 to-transparent transition-opacity duration-300 flex items-center justify-between gap-4 pointer-events-none ${
           controlsVisible ? 'opacity-100' : 'opacity-0'
         }`}
       >
-        <div className="flex items-center gap-2.5 pointer-events-auto">
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-red-600/90 text-white shadow-md">
-            <Radio className="w-3.5 h-3.5 animate-pulse" />
+        {/* Single 'AO VIVO' Badge in the entire application */}
+        <div className="flex items-center gap-3 pointer-events-auto">
+          <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-black tracking-widest bg-red-600 text-white shadow-xl shadow-red-600/30 select-none">
+            <span className="w-2 h-2 rounded-full bg-white animate-ping" />
             AO VIVO
           </span>
-          <h1 className="text-sm sm:text-base font-semibold text-white drop-shadow truncate max-w-sm sm:max-w-md lg:max-w-2xl">
-            {streamTitle}
-          </h1>
+          <span className="hidden sm:inline-block text-xs font-medium text-neutral-300 truncate max-w-md">
+            {streamName}
+          </span>
         </div>
 
+        {/* Top-Right Quick Actions */}
         <div className="pointer-events-auto flex items-center gap-2">
           {activeResolution && (
-            <span className="hidden sm:inline-block text-[11px] font-mono px-2 py-0.5 rounded bg-black/60 text-sky-300 border border-neutral-700/60 backdrop-blur">
+            <span className="hidden sm:inline-block text-[11px] font-mono px-2.5 py-1 rounded-md bg-neutral-900/80 text-sky-400 border border-neutral-700/80 backdrop-blur">
               {activeResolution}
             </span>
+          )}
+
+          <button
+            onClick={() => setReloadCounter((c) => c + 1)}
+            className="p-2 text-neutral-300 hover:text-white bg-neutral-900/80 hover:bg-neutral-800 border border-neutral-700/80 rounded-lg transition"
+            title="Recarregar transmissão"
+            aria-label="Recarregar"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </button>
+
+          {onOpenShortcuts && (
+            <button
+              onClick={onOpenShortcuts}
+              className="p-2 text-neutral-300 hover:text-white bg-neutral-900/80 hover:bg-neutral-800 border border-neutral-700/80 rounded-lg transition"
+              title="Atalhos de teclado"
+              aria-label="Atalhos de teclado"
+            >
+              <HelpCircle className="w-4 h-4" />
+            </button>
           )}
         </div>
       </div>
 
-      {/* Custom Bottom Controls Bar */}
+      {/* Bottom Floating Controls Bar */}
       <div
-        className={`absolute bottom-0 inset-x-0 z-30 p-3 sm:p-5 bg-gradient-to-t from-black/95 via-black/70 to-transparent transition-opacity duration-300 space-y-2 ${
+        className={`absolute bottom-0 inset-x-0 z-30 p-4 sm:p-6 bg-gradient-to-t from-black/95 via-black/70 to-transparent transition-opacity duration-300 space-y-2.5 ${
           controlsVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
       >
-        {/* Progress bar / DVR buffer bar */}
-        <div className="w-full group/seek relative py-1 flex items-center cursor-pointer">
-          <div className="w-full h-1.5 bg-neutral-800/80 rounded-full overflow-hidden relative">
-            {/* Buffered progress */}
+        {/* Progress / buffer bar */}
+        <div className="w-full relative py-1 flex items-center">
+          <div className="w-full h-1.5 bg-neutral-800/90 rounded-full overflow-hidden relative">
             <div
-              className="absolute left-0 top-0 bottom-0 bg-neutral-600/60 rounded-full transition-all"
+              className="absolute left-0 top-0 bottom-0 bg-neutral-600/60 rounded-full"
               style={{
                 width: `${Math.min(100, ((currentTime + stats.bufferLength) / (duration || currentTime + stats.bufferLength || 1)) * 100)}%`,
               }}
             />
-            {/* Playhead */}
             <div
               className="absolute left-0 top-0 bottom-0 bg-sky-500 rounded-full"
               style={{
@@ -652,36 +636,36 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
         </div>
 
         {/* Buttons Row */}
-        <div className="flex items-center justify-between gap-2 sm:gap-4 text-white">
-          {/* Left Controls: Play, Live edge, Volume, Time */}
-          <div className="flex items-center gap-1.5 sm:gap-3">
+        <div className="flex items-center justify-between gap-3 text-white">
+          {/* Left: Play/Pause, Sync Status, Volume, Time */}
+          <div className="flex items-center gap-2 sm:gap-3">
             <button
               onClick={togglePlay}
-              className="p-2 sm:p-2.5 rounded-xl hover:bg-white/10 active:scale-95 transition-all text-white"
-              aria-label={isPlaying ? 'Pausar transmissão' : 'Reproduzir transmissão'}
+              className="p-2.5 rounded-xl hover:bg-white/10 active:scale-95 transition text-white"
+              aria-label={isPlaying ? 'Pausar' : 'Reproduzir'}
             >
               {isPlaying ? <Pause className="w-5 h-5 fill-white" /> : <Play className="w-5 h-5 fill-white" />}
             </button>
 
-            {/* Jump to Live edge button */}
+            {/* Live synchronization indicator (without repeating the word ao vivo) */}
             {isLive && (
               <button
                 onClick={jumpToLiveEdge}
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold transition-all ${
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs transition ${
                   isAtLiveEdge
-                    ? 'bg-red-600 text-white cursor-default'
-                    : 'bg-neutral-800 text-neutral-300 hover:bg-red-600/80 hover:text-white'
+                    ? 'text-emerald-400 bg-emerald-950/40 border border-emerald-800/40 cursor-default'
+                    : 'text-neutral-300 bg-neutral-800 hover:bg-neutral-700'
                 }`}
-                title="Sincronizar com o ponto Ao Vivo"
-                aria-label="Ponto ao vivo"
+                title="Sincronizar com transmissão direta"
+                aria-label="Sincronizar transmissão"
               >
-                <span className={`w-2 h-2 rounded-full ${isAtLiveEdge ? 'bg-white animate-ping' : 'bg-neutral-400'}`} />
-                AO VIVO
+                <Radio className={`w-3 h-3 ${isAtLiveEdge ? 'animate-pulse' : ''}`} />
+                <span className="font-mono text-[11px]">{isAtLiveEdge ? 'Sincronizado' : 'Sincronizar'}</span>
               </button>
             )}
 
-            {/* Volume & Mute */}
-            <div className="flex items-center gap-2 group/vol">
+            {/* Volume */}
+            <div className="flex items-center gap-2">
               <button
                 onClick={toggleMute}
                 className="p-2 rounded-xl hover:bg-white/10 transition text-neutral-200 hover:text-white"
@@ -703,41 +687,49 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
                 step="0.05"
                 value={isMuted ? 0 : volume}
                 onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
-                className="w-16 sm:w-24 h-1.5 bg-neutral-700 accent-sky-400 rounded-lg cursor-pointer"
+                className="w-16 sm:w-28 h-1.5 bg-neutral-700 accent-sky-400 rounded-lg cursor-pointer"
                 aria-label="Controle de volume"
               />
             </div>
 
-            {/* Time display */}
             <span className="hidden sm:inline-block text-xs font-mono text-neutral-400">
               {formatTime(currentTime)}
-              {duration > 0 && isFinite(duration) && ` / ${formatTime(duration)}`}
             </span>
           </div>
 
-          {/* Right Controls: Aspect ratio, Quality, Stats, PiP, Fullscreen */}
-          <div className="flex items-center gap-1 sm:gap-2 relative">
-            {/* Technical Stats Toggle */}
+          {/* Right: Aspect Ratio, Stats, Quality/Stream Menu, PiP, Fullscreen */}
+          <div className="flex items-center gap-1.5 sm:gap-2.5 relative">
+            {/* Aspect Ratio Toggle (Cover vs Contain) */}
+            <button
+              onClick={() => setAspectMode((prev) => (prev === 'contain' ? 'cover' : 'contain'))}
+              className="px-2 py-1 text-xs font-medium rounded-lg text-neutral-300 hover:text-white bg-neutral-900/80 hover:bg-neutral-800 border border-neutral-700/80 transition"
+              title="Ajustar proporção (Ajustar / Preencher)"
+              aria-label="Proporção da imagem"
+            >
+              {aspectMode === 'contain' ? 'Ajustar' : 'Preencher'}
+            </button>
+
+            {/* Stats Overlay Toggle (S) */}
             <button
               onClick={() => setShowStats((prev) => !prev)}
               className={`p-2 rounded-xl transition ${
                 showStats ? 'bg-sky-500/30 text-sky-400' : 'text-neutral-300 hover:text-white hover:bg-white/10'
               }`}
-              title="Estatísticas técnicas do fluxo (S)"
-              aria-label="Estatísticas da transmissão"
+              title="Estatísticas técnicas (S)"
+              aria-label="Estatísticas técnicas"
             >
               <Activity className="w-4 h-4" />
             </button>
 
-            {/* Settings & Quality Selector Dropdown Trigger */}
+            {/* Settings & Channel Selector */}
             <div className="relative">
               <button
                 onClick={() => setShowSettingsMenu((prev) => !prev)}
-                className={`p-2 rounded-xl transition flex items-center gap-1 text-xs font-medium ${
+                className={`p-2 rounded-xl transition flex items-center gap-1.5 text-xs font-medium ${
                   showSettingsMenu ? 'bg-sky-500/30 text-sky-400' : 'text-neutral-300 hover:text-white hover:bg-white/10'
                 }`}
-                title="Configurações de Qualidade e Proporção"
-                aria-label="Qualidade do vídeo"
+                title="Configurações de Transmissão e Qualidade"
+                aria-label="Configurações do vídeo"
                 aria-haspopup="true"
                 aria-expanded={showSettingsMenu}
               >
@@ -745,17 +737,45 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
                 <span className="hidden md:inline font-mono text-[11px]">{activeResolution}</span>
               </button>
 
-              {/* Quality & Aspect menu modal */}
+              {/* Settings Dropdown */}
               {showSettingsMenu && (
                 <div
-                  className="absolute bottom-12 right-0 w-64 bg-neutral-900/95 backdrop-blur-md border border-neutral-700/80 rounded-2xl p-3 shadow-2xl text-xs space-y-3 z-50 animate-fadeIn"
+                  className="absolute bottom-12 right-0 w-72 bg-neutral-900/95 backdrop-blur-md border border-neutral-700/80 rounded-2xl p-3.5 shadow-2xl text-xs space-y-3 z-50 animate-fadeIn"
                   role="menu"
                 >
+                  {/* Stream Selection */}
                   <div>
-                    <span className="text-[10px] uppercase font-bold tracking-wider text-neutral-400 px-2 block mb-1.5">
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-neutral-400 px-2 block mb-1">
+                      Fonte de Transmissão
+                    </span>
+                    <div className="space-y-1">
+                      {DEFAULT_PRESETS.map((preset) => {
+                        const isSelected = streamUrl === preset.url;
+                        return (
+                          <button
+                            key={preset.id}
+                            onClick={() => switchPreset(preset.url, preset.title)}
+                            className={`w-full text-left px-2.5 py-1.5 rounded-lg flex items-center justify-between transition ${
+                              isSelected
+                                ? 'bg-sky-500/20 text-sky-300 font-semibold'
+                                : 'hover:bg-neutral-800 text-neutral-300'
+                            }`}
+                            role="menuitem"
+                          >
+                            <span className="truncate pr-2">{preset.title}</span>
+                            {isSelected && <Check className="w-3.5 h-3.5 text-sky-400 shrink-0" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Quality Selection */}
+                  <div className="border-t border-neutral-800 pt-2.5">
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-neutral-400 px-2 block mb-1">
                       Qualidade HLS (ABR)
                     </span>
-                    <div className="space-y-0.5">
+                    <div className="space-y-1 max-h-48 overflow-y-auto">
                       <button
                         onClick={() => handleSelectQuality(-1)}
                         className={`w-full text-left px-2.5 py-1.5 rounded-lg flex items-center justify-between transition ${
@@ -766,7 +786,7 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
                         role="menuitem"
                       >
                         <span>Automático (Adaptativo)</span>
-                        {currentLevel === -1 && <Check className="w-3.5 h-3.5 text-sky-400" />}
+                        {currentLevel === -1 && <Check className="w-3.5 h-3.5 text-sky-400 shrink-0" />}
                       </button>
 
                       {qualityLevels.map((lvl) => (
@@ -781,43 +801,11 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
                           role="menuitem"
                         >
                           <span>{lvl.label}</span>
-                          {currentLevel === lvl.id && <Check className="w-3.5 h-3.5 text-sky-400" />}
+                          {currentLevel === lvl.id && <Check className="w-3.5 h-3.5 text-sky-400 shrink-0" />}
                         </button>
                       ))}
-
-                      {qualityLevels.length === 0 && (
-                        <p className="text-[11px] text-neutral-400 px-2 py-1">
-                          Fluxo com qualidade única fixa.
-                        </p>
-                      )}
                     </div>
                   </div>
-
-                  {onAspectModeChange && (
-                    <div className="border-t border-neutral-800 pt-2">
-                      <span className="text-[10px] uppercase font-bold tracking-wider text-neutral-400 px-2 block mb-1.5">
-                        Proporção de Tela
-                      </span>
-                      <div className="grid grid-cols-2 gap-1">
-                        {(['16:9', '21:9', 'fill', 'contain'] as AspectRatioMode[]).map((mode) => (
-                          <button
-                            key={mode}
-                            onClick={() => {
-                              onAspectModeChange(mode);
-                              setShowSettingsMenu(false);
-                            }}
-                            className={`px-2 py-1 rounded text-center transition ${
-                              aspectMode === mode
-                                ? 'bg-sky-500/20 text-sky-300 font-bold border border-sky-500/40'
-                                : 'bg-neutral-800/70 hover:bg-neutral-800 text-neutral-400'
-                            }`}
-                          >
-                            {mode === '16:9' ? '16:9 Padrão' : mode === '21:9' ? '21:9 Cinema' : mode === 'fill' ? 'Preencher' : 'Ajustar'}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
                 </div>
               )}
             </div>
@@ -826,8 +814,8 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
             <button
               onClick={togglePiP}
               className="p-2 rounded-xl text-neutral-300 hover:text-white hover:bg-white/10 transition hidden sm:inline-block"
-              title="Janela Flutuante / Picture-in-Picture (P)"
-              aria-label="Picture in picture"
+              title="Janela Flutuante (PiP)"
+              aria-label="Janela flutuante"
             >
               <PictureInPicture className="w-4 h-4" />
             </button>
