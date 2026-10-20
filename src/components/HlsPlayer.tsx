@@ -18,7 +18,7 @@ import {
   Volume2 as UnmuteIcon,
 } from 'lucide-react';
 import { StatsOverlay, StreamStats } from './StatsOverlay';
-import { getResolutionLabel, formatTime, DEFAULT_PRESETS } from '../utils/stream';
+import { getResolutionLabel, formatTime, DEFAULT_PRESETS, resolvePlayableStreamUrl } from '../utils/stream';
 
 export type AspectRatioMode = 'cover' | 'contain';
 
@@ -139,8 +139,10 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
       hlsRef.current = hls;
       hls.attachMedia(video);
 
+      const playableUrl = resolvePlayableStreamUrl(streamUrl);
+
       hls.on(Hls.Events.MEDIA_ATTACHED, () => {
-        hls.loadSource(streamUrl);
+        hls.loadSource(playableUrl);
       });
 
       hls.on(Hls.Events.MANIFEST_PARSED, (_event, data) => {
@@ -200,11 +202,13 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
       hls.on(Hls.Events.LEVEL_SWITCHED, (_event, data) => {
         const lvl = hls.levels[data.level];
         if (lvl) {
-          const res = getResolutionLabel(lvl.height, lvl.width, lvl.bitrate);
+          const w = lvl.width || video.videoWidth;
+          const h = lvl.height || video.videoHeight;
+          const res = getResolutionLabel(h, w, lvl.bitrate);
           setActiveResolution(res);
           setStats((prev) => ({
             ...prev,
-            resolution: `${lvl.width || '?'}x${lvl.height || '?'} (${res})`,
+            resolution: w && h ? `${w}x${h} (${res})` : res,
             bitrate: lvl.bitrate,
             currentLevelIndex: data.level,
           }));
@@ -232,7 +236,7 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
       });
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
       // Native HLS for Safari / iOS
-      video.src = streamUrl;
+      video.src = resolvePlayableStreamUrl(streamUrl);
       setStats((prev) => ({ ...prev, hlsEngine: 'Native HLS' }));
       video.addEventListener('loadedmetadata', () => {
         setIsBuffering(false);
@@ -285,14 +289,31 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
         setIsAtLiveEdge(diff < 8);
       }
 
-      setStats((prev) => ({
-        ...prev,
-        bufferLength: bufferSecs,
-        droppedFrames: dropped,
-        totalFrames: total,
-        isLive: isLiveNow,
-        resolution: prev.resolution || (video.videoWidth ? `${video.videoWidth}x${video.videoHeight}` : ''),
-      }));
+      const actualWidth = video.videoWidth;
+      const actualHeight = video.videoHeight;
+      const actualRes = actualHeight ? getResolutionLabel(actualHeight, actualWidth) : '';
+
+      setStats((prev) => {
+        const hasValidRes = prev.resolution && !prev.resolution.includes('?');
+        const resolvedRes = hasValidRes
+          ? prev.resolution
+          : actualWidth && actualHeight
+          ? `${actualWidth}x${actualHeight} (${actualRes})`
+          : prev.resolution || 'Identificando...';
+
+        return {
+          ...prev,
+          bufferLength: bufferSecs,
+          droppedFrames: dropped,
+          totalFrames: total,
+          isLive: isLiveNow,
+          resolution: resolvedRes,
+        };
+      });
+
+      if (actualRes && (activeResolution === 'Auto' || activeResolution === 'Automático')) {
+        setActiveResolution(actualRes);
+      }
     }, 1000);
 
     return () => clearInterval(interval);

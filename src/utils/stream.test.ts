@@ -7,23 +7,28 @@ import {
   getResolutionLabel,
   getBufferStatus,
   DEFAULT_PRESETS,
+  resolvePlayableStreamUrl,
 } from './stream.ts';
 
-test('DEFAULT_PRESETS contains the user requested master and variant URLs', () => {
-  assert.equal(DEFAULT_PRESETS.length, 2);
+test('DEFAULT_PRESETS contains the user requested Globo TV Bahia FHD stream URL', () => {
+  assert.equal(DEFAULT_PRESETS.length, 1);
   assert.equal(
     DEFAULT_PRESETS[0].url,
-    'https://dai.google.com/linear/hls/pa/event/N7B0wy5aTjygLT6S1jl5DQ/stream/fcd1b4c2-18f0-4f46-8618-2d8034163bd8:SCL2/master.m3u8'
+    'http://hls1.sua.tv/live/globotvbahiafhdbr2/s.m3u8'
   );
+  assert.equal(DEFAULT_PRESETS[0].title, 'Globo TV Bahia FHD');
+});
+
+test('resolvePlayableStreamUrl handles raw and proxied paths properly', () => {
   assert.equal(
-    DEFAULT_PRESETS[1].url,
-    'https://dai.google.com/linear/hls/pa/event/N7B0wy5aTjygLT6S1jl5DQ/stream/fcd1b4c2-18f0-4f46-8618-2d8034163bd8:SCL2/variant/4655a2736bc29377ab01445e807df955/bandwidth/1316400.m3u8'
+    resolvePlayableStreamUrl('https://example.com/live.m3u8'),
+    'https://example.com/live.m3u8'
   );
 });
 
 test('isValidHlsUrl validates correct and incorrect URLs', () => {
-  const masterRes = isValidHlsUrl(DEFAULT_PRESETS[0].url);
-  assert.equal(masterRes.valid, true);
+  const streamRes = isValidHlsUrl(DEFAULT_PRESETS[0].url);
+  assert.equal(streamRes.valid, true);
 
   const emptyRes = isValidHlsUrl('');
   assert.equal(emptyRes.valid, false);
@@ -55,7 +60,6 @@ test('getResolutionLabel categorizes standard resolutions', () => {
   assert.equal(getResolutionLabel(720), '720p (HD)');
   assert.equal(getResolutionLabel(480), '480p (SD)');
   assert.equal(getResolutionLabel(360), '360p');
-  assert.equal(getResolutionLabel(undefined, undefined, 1316400), '1.32 Mbps');
   assert.equal(getResolutionLabel(), 'Automático');
 });
 

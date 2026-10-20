@@ -6,6 +6,10 @@
   "cleanUrls": true,
   "rewrites": [
     {
+      "source": "/stream-proxy/:path*",
+      "destination": "http://hls1.sua.tv/:path*"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

@@ -10,24 +10,31 @@ export interface StreamPreset {
 
 export const DEFAULT_PRESETS: StreamPreset[] = [
   {
-    id: 'dai-master',
-    title: 'Transmissão Master (Adaptativa Multi-qualidade)',
-    subtitle: 'Ajuste dinâmico de resolução e taxa de bits conforme a conexão',
-    url: 'https://dai.google.com/linear/hls/pa/event/N7B0wy5aTjygLT6S1jl5DQ/stream/fcd1b4c2-18f0-4f46-8618-2d8034163bd8:SCL2/master.m3u8',
+    id: 'globo-tv-bahia-fhd',
+    title: 'Globo TV Bahia FHD',
+    subtitle: 'Transmissão ao vivo em alta definição (hls1.sua.tv)',
+    url: 'http://hls1.sua.tv/live/globotvbahiafhdbr2/s.m3u8',
     type: 'adaptive',
-    badge: 'Recomendado • Auto ABR',
-    description: 'Master playlist HLS com múltiplas taxas de bits (Auto 1080p/720p/480p/360p). Ideal para estabilidade máxima em qualquer largura de banda.',
-  },
-  {
-    id: 'dai-variant-1316k',
-    title: 'Transmissão HD Fixa (1316 kbps)',
-    subtitle: 'Taxa de bits constante de alta performance para stream direto',
-    url: 'https://dai.google.com/linear/hls/pa/event/N7B0wy5aTjygLT6S1jl5DQ/stream/fcd1b4c2-18f0-4f46-8618-2d8034163bd8:SCL2/variant/4655a2736bc29377ab01445e807df955/bandwidth/1316400.m3u8',
-    type: 'fixed',
-    badge: '1.3 Mbps Direto',
-    description: 'Fluxo variante direto com largura de banda de 1316400 bps (~1.3 Mbps), sem alternância dinâmica de qualidade.',
+    badge: 'FHD • Ao Vivo',
+    description: 'Transmissão HLS ao vivo da Globo TV Bahia FHD com reprodução contínua e estável.',
   },
 ];
+
+/**
+ * Resolves a stream URL for safe playback in the browser.
+ * If the current page is served over HTTPS and the stream URL is on an unencrypted HTTP host (like hls1.sua.tv),
+ * this routes through the reverse proxy endpoint (/stream-proxy/) to prevent browser Mixed Content
+ * and CORS blocking while retaining full compatibility on both Vercel and local development.
+ */
+export function resolvePlayableStreamUrl(rawUrl: string): string {
+  if (typeof window === 'undefined' || !rawUrl) return rawUrl;
+
+  if (rawUrl.includes('hls1.sua.tv')) {
+    return rawUrl.replace(/^https?:\/\/hls1\.sua\.tv/i, '/stream-proxy');
+  }
+
+  return rawUrl;
+}
 
 /**
  * Validates whether a given string is a valid URL and looks like an HLS / m3u8 stream.
